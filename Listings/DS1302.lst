@@ -1,0 +1,136 @@
+C51 COMPILER V9.54   DS1302                                                                05/19/2026 14:10:31 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE DS1302
+OBJECT MODULE PLACED IN .\Objects\DS1302.obj
+COMPILER INVOKED BY: D:\Keil5\C51\BIN\C51.EXE DS1302.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\DS13
+                    -02.lst) OBJECT(.\Objects\DS1302.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          
+   3          //对端口进行定义
+   4          sbit DS1302_SCLK=P3^6;
+   5          sbit DS1302_IO=P3^4;
+   6          sbit DS1302_CE=P3^5;
+   7          
+   8          #define DS1302_WP       0x8E    //写保护的地址
+   9          
+  10          //DS1302写入时间的地址：年，月，日，时，分，秒，星期
+  11          unsigned char code DS1302_WriteAddress[7]={0x8c,0x88,0x86,0x84,0x82,0x80,0x8a,};
+  12          //DS1302读取时间的地址：年，月，日，时，分，秒，星期
+  13          unsigned char code DS1302_ReadAddress[7]={0x8d,0x89,0x87,0x85,0x83,0x81,0x8b,};
+  14          //时间数组：年，月，日，时，分，秒，星期
+  15          char DS1302_Time[]={24,10,30,9,13,53,3};        //时间设置的初始值
+  16          
+  17          /**
+  18            * @brief  DS1302初始化
+  19            * @param  无
+  20            * @retval 无
+  21            */
+  22          void DS1302_Init(void)
+  23          {
+  24   1              DS1302_CE=0;
+  25   1              DS1302_SCLK=0;
+  26   1      }
+  27          
+  28          /**
+  29            * @brief  DS1302写一个字节
+  30            * @param  Command 命令字/地址
+  31            * @param  Data 要写入的数据
+  32            * @retval 无
+  33            */
+  34          void DS1302_WriteByte(unsigned char Command,unsigned char Data)
+  35          {
+  36   1              unsigned char i;
+  37   1              DS1302_CE=1;
+  38   1              for(i=0;i<8;i++)        //循环8次，每次写1位，先写低位再写高位
+  39   1              {
+  40   2                      DS1302_IO=Command&(0x01<<i);    //“&与”，用于清零
+  41   2                      DS1302_SCLK=1;  //SCLK置1后立即置0，该时序操作需考虑时钟芯片是否可承受这个时钟的最快频率
+  42   2                      DS1302_SCLK=0;  //由于单片机没有这么快的频率，故可不加延时
+  43   2              }
+  44   1              for(i=0;i<8;i++)
+  45   1              {
+  46   2                      DS1302_IO=Data&(0x01<<i);
+  47   2                      DS1302_SCLK=1;  //CLK由低到高产生一个上升沿，从而写入数据
+  48   2                      DS1302_SCLK=0;
+  49   2              }
+  50   1              DS1302_CE=0;
+  51   1      }
+  52          
+  53          /**
+  54            * @brief  DS1302读一个字节
+C51 COMPILER V9.54   DS1302                                                                05/19/2026 14:10:31 PAGE 2   
+
+  55            * @param  Command     命令字/地址
+  56            * @retval Data        读出的数据
+  57            */
+  58          unsigned char DS1302_ReadByte(unsigned char Command)
+  59          {
+  60   1              unsigned char i,Data=0x00;
+  61   1              DS1302_CE=1;
+  62   1              for(i=0;i<8;i++)
+  63   1              {
+  64   2                      DS1302_IO=Command&(0x01<<i);
+  65   2                      DS1302_SCLK=0;
+  66   2                      DS1302_SCLK=1;
+  67   2              }
+  68   1              for(i=0;i<8;i++)
+  69   1              {
+  70   2                      DS1302_SCLK=1;
+  71   2                      DS1302_SCLK=0;  //要先1后0，否则全都是65
+  72   2                      if(DS1302_IO){Data|=(0x01<<i);}
+  73   2              }
+  74   1              DS1302_CE=0;
+  75   1              DS1302_IO=0;    //读取后将IO设置为0，否则读出的数据会出错
+  76   1              return Data;
+  77   1      }
+  78          
+  79          /**
+  80            * @brief  DS1302设置时间，调用之后，DS1302_Time数组的数字会被设置到DS1302中
+  81            * @param  无
+  82            * @retval 无
+  83            */
+  84          void DS1302_SetTime(void)
+  85          {
+  86   1              unsigned char i;
+  87   1              DS1302_WriteByte(DS1302_WP,0x00);       //设置前把关闭写保护
+  88   1              for(i=0;i<7;i++)        //依次写入：年，月，日，时，分，秒，星期
+  89   1              {
+  90   2                      DS1302_WriteByte(DS1302_WriteAddress[i],DS1302_Time[i]/10*16+DS1302_Time[i]%10);        //十进制转换为BCD码
+  91   2              }
+  92   1              DS1302_WriteByte(DS1302_WP,0x80);       //设置后开启写保护
+  93   1      }
+  94          
+  95          /**
+  96            * @brief  DS1302读取时间，调用之后，DS1302中的数据会被读取到DS1302_Time数组中
+  97            * @param  无
+  98            * @retval 无
+  99            */
+ 100          void DS1302_ReadTime(void)
+ 101          {
+ 102   1              unsigned char Temp,i;
+ 103   1              for(i=0;i<7;i++)        //依次读取：年，月，日，时，分，秒，星期
+ 104   1              {
+ 105   2                      Temp=DS1302_ReadByte(DS1302_ReadAddress[i]);
+ 106   2                      DS1302_Time[i]=Temp/16*10+Temp%16;//BCD码转十进制后读取
+ 107   2              }
+ 108   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    254    ----
+   CONSTANT SIZE    =     14    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      7    ----
+C51 COMPILER V9.54   DS1302                                                                05/19/2026 14:10:31 PAGE 3   
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

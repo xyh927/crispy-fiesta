@@ -1,0 +1,119 @@
+C51 COMPILER V9.54   DHT11                                                                 05/19/2026 14:05:45 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE DHT11
+OBJECT MODULE PLACED IN .\Objects\DHT11.obj
+COMPILER INVOKED BY: D:\Keil5\C51\BIN\C51.EXE DHT11.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\DHT11
+                    -.lst) OBJECT(.\Objects\DHT11.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          
+   3          //引脚定义
+   4          sbit DHT11=P2^4;        //温湿度模块的数据线接在P2^4引脚上
+   5          
+   6          //用数组存储接收到的数据
+   7          unsigned char DHT11Data[5]={0};
+   8          
+   9          /**
+  10            * @brief      DHT11延时私有函数，延时20ms@11.0592MHz
+  11            * @param      无
+  12            * @retval     
+  13            */
+  14          void DHT11_Delay20ms(void)
+  15          {
+  16   1              unsigned char i,j;
+  17   1      
+  18   1              i = 36;
+  19   1              j = 217;
+  20   1              do
+  21   1              {
+  22   2                      while(--j);
+  23   2              } while(--i);
+  24   1      }
+  25          
+  26          /**
+  27            * @brief      DHT11初始化
+  28            * @param      无
+  29            * @retval     返回应答位，模块存在则返回0
+  30            */
+  31          unsigned char DHT11_Init(void)
+  32          {
+  33   1              unsigned char i;
+  34   1              unsigned char TimeOutFlag;      //超时标志
+  35   1              unsigned char AckBit;   //应答位
+  36   1              DHT11=0;
+  37   1              DHT11_Delay20ms();      //Delay 20ms（范围：18ms~30ms）
+  38   1              DHT11=1;
+  39   1              i=23;while(--i);        //Delay 51us @11.0592MHz
+  40   1              AckBit=DHT11;
+  41   1              while((!DHT11)&&--TimeOutFlag); //超时则退出while循环
+  42   1              while(DHT11&&--TimeOutFlag);
+  43   1              return AckBit;
+  44   1      }
+  45          
+  46          /**
+  47            * @brief      DHT11接收一个字节
+  48            * @param      无
+  49            * @retval     要接收的字节
+  50            */
+  51          unsigned char DHT11_ReceiveByte(void)
+  52          {
+  53   1              unsigned char Byte=0x00;
+  54   1              unsigned char i,j;
+C51 COMPILER V9.54   DHT11                                                                 05/19/2026 14:05:45 PAGE 2   
+
+  55   1              unsigned char TimeOutFlag;
+  56   1              
+  57   1              for(j=0;j<8;j++)
+  58   1              {
+  59   2                      TimeOutFlag=100;
+  60   2                      while(!DHT11&&--TimeOutFlag);
+  61   2                      if(TimeOutFlag==0)break;        //超时则退出for循环
+  62   2                      i=15;while(--i);        //拉高34us
+  63   2                      if(DHT11){Byte|=(0x80>>j);}
+  64   2                      TimeOutFlag=100;
+  65   2                      while(DHT11&&--TimeOutFlag);
+  66   2                      if(TimeOutFlag==0)break;        //超时则退出for循环
+  67   2              }
+  68   1              return Byte;
+  69   1      }
+  70          
+  71          /**
+  72            * @brief      DHT11读取5个字节的数据
+  73            * @param      无
+  74            * @retval     返回读数是否正确的标志位，1：正确，0：错误
+  75            */
+  76          unsigned char DHT11_ReadData(void)
+  77          {
+  78   1              unsigned char i;
+  79   1              unsigned char DHTFlag;
+  80   1              DHT11_Init();
+  81   1              EA=0;   //单总线时序不能被打断，如果用到中断，需要暂时关闭中断
+  82   1              for(i=0;i<5;i++)
+  83   1              {
+  84   2                      DHT11Data[i]=DHT11_ReceiveByte();
+  85   2              }
+  86   1              EA=1;   //重新开启中断
+  87   1              i=23;while(--i);        //Delay 51us
+  88   1              if(DHT11Data[0]+DHT11Data[1]+DHT11Data[2]+DHT11Data[3]==DHT11Data[4])
+  89   1              {DHTFlag=1;}
+  90   1              else{DHTFlag=0;}
+  91   1              return DHTFlag;
+  92   1      }
+  93          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    153    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      5       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,108 @@
+#include <REGX52.H>
+
+//对端口进行定义
+sbit DS1302_SCLK=P3^6;
+sbit DS1302_IO=P3^4;
+sbit DS1302_CE=P3^5;
+
+#define DS1302_WP	0x8E	//写保护的地址
+
+//DS1302写入时间的地址：年，月，日，时，分，秒，星期
+unsigned char code DS1302_WriteAddress[7]={0x8c,0x88,0x86,0x84,0x82,0x80,0x8a,};
+//DS1302读取时间的地址：年，月，日，时，分，秒，星期
+unsigned char code DS1302_ReadAddress[7]={0x8d,0x89,0x87,0x85,0x83,0x81,0x8b,};
+//时间数组：年，月，日，时，分，秒，星期
+char DS1302_Time[]={24,10,30,9,13,53,3};	//时间设置的初始值
+
+/**
+  * @brief  DS1302初始化
+  * @param  无
+  * @retval 无
+  */
+void DS1302_Init(void)
+{
+	DS1302_CE=0;
+	DS1302_SCLK=0;
+}
+
+/**
+  * @brief  DS1302写一个字节
+  * @param  Command 命令字/地址
+  * @param  Data 要写入的数据
+  * @retval 无
+  */
+void DS1302_WriteByte(unsigned char Command,unsigned char Data)
+{
+	unsigned char i;
+	DS1302_CE=1;
+	for(i=0;i<8;i++)	//循环8次，每次写1位，先写低位再写高位
+	{
+		DS1302_IO=Command&(0x01<<i);	//“&与”，用于清零
+		DS1302_SCLK=1;	//SCLK置1后立即置0，该时序操作需考虑时钟芯片是否可承受这个时钟的最快频率
+		DS1302_SCLK=0;	//由于单片机没有这么快的频率，故可不加延时
+	}
+	for(i=0;i<8;i++)
+	{
+		DS1302_IO=Data&(0x01<<i);
+		DS1302_SCLK=1;	//CLK由低到高产生一个上升沿，从而写入数据
+		DS1302_SCLK=0;
+	}
+	DS1302_CE=0;
+}
+
+/**
+  * @brief  DS1302读一个字节
+  * @param  Command	命令字/地址
+  * @retval Data	读出的数据
+  */
+unsigned char DS1302_ReadByte(unsigned char Command)
+{
+	unsigned char i,Data=0x00;
+	DS1302_CE=1;
+	for(i=0;i<8;i++)
+	{
+		DS1302_IO=Command&(0x01<<i);
+		DS1302_SCLK=0;
+		DS1302_SCLK=1;
+	}
+	for(i=0;i<8;i++)
+	{
+		DS1302_SCLK=1;
+		DS1302_SCLK=0;	//要先1后0，否则全都是65
+		if(DS1302_IO){Data|=(0x01<<i);}
+	}
+	DS1302_CE=0;
+	DS1302_IO=0;	//读取后将IO设置为0，否则读出的数据会出错
+	return Data;
+}
+
+/**
+  * @brief  DS1302设置时间，调用之后，DS1302_Time数组的数字会被设置到DS1302中
+  * @param  无
+  * @retval 无
+  */
+void DS1302_SetTime(void)
+{
+	unsigned char i;
+	DS1302_WriteByte(DS1302_WP,0x00);	//设置前把关闭写保护
+	for(i=0;i<7;i++)	//依次写入：年，月，日，时，分，秒，星期
+	{
+		DS1302_WriteByte(DS1302_WriteAddress[i],DS1302_Time[i]/10*16+DS1302_Time[i]%10);	//十进制转换为BCD码
+	}
+	DS1302_WriteByte(DS1302_WP,0x80);	//设置后开启写保护
+}
+
+/**
+  * @brief  DS1302读取时间，调用之后，DS1302中的数据会被读取到DS1302_Time数组中
+  * @param  无
+  * @retval 无
+  */
+void DS1302_ReadTime(void)
+{
+	unsigned char Temp,i;
+	for(i=0;i<7;i++)	//依次读取：年，月，日，时，分，秒，星期
+	{
+		Temp=DS1302_ReadByte(DS1302_ReadAddress[i]);
+		DS1302_Time[i]=Temp/16*10+Temp%16;//BCD码转十进制后读取
+	}
+}
